@@ -29,7 +29,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
-
+  console.log(address);
   const toggleNotifications = (
     e: MouseEvent<HTMLDivElement | HTMLButtonElement>
   ): void => {

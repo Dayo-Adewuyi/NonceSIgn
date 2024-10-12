@@ -1,17 +1,47 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, useAnimation } from "framer-motion";
-import { Plus, FileText, ChevronRight, Activity, Users } from "lucide-react";
+import { Plus, FileText, ChevronRight, Activity } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useRouter } from "next/navigation";
-
+import { useReadContract, useWatchContractEvent, useAccount } from "wagmi";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../constants";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("home");
+  const [documentCount, setDocumentCount] = useState(0);
+  const [notifications, setNotifications] = useState<string[]>([]);
   const controls = useAnimation();
   const router = useRouter();
- 
+  const { address } = useAccount();
+
+  const { data: documentsAssigned } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: "getDocumentsAssignedToUser",
+    args: [address],
+  });
+
+  useEffect(() => {
+    if (documentsAssigned) {
+      if (
+        Array.isArray(documentsAssigned) ||
+        (typeof documentsAssigned === "object" && "length" in documentsAssigned)
+      ) {
+        setDocumentCount((documentsAssigned as any[]).length);
+      } else if (typeof documentsAssigned === "bigint") {
+        setDocumentCount(1);
+      } else {
+        console.error(
+          "Unexpected type for documentsAssigned:",
+          documentsAssigned
+        );
+        setDocumentCount(0);
+      }
+      console.log(documentsAssigned);
+    }
+  }, [documentsAssigned]);
 
   useEffect(() => {
     controls.start((i) => ({
@@ -21,13 +51,46 @@ const Dashboard = () => {
     }));
   }, [controls]);
 
+  // const addNotification = useCallback((newNotification: string) => {
+  //   setNotifications((prevNotifications) => [
+  //     ...prevNotifications,
+  //     newNotification,
+  //   ]);
+  // }, []);
+
+  // useWatchContractEvent({
+  //   address: CONTRACT_ADDRESS,
+  //   abi: CONTRACT_ABI,
+  //   eventName: "DocumentCreated",
+  //   fromBlock: BigInt(0),
+  //   onLogs: (logs) => {
+  //     logs.forEach((log: any) => {
+  //       const [documentId, title, signers, creator] = log.args as [
+  //         bigint,
+  //         string,
+  //         `0x${string}`[],
+  //         `0x${string}`,
+  //       ];
+  //       console.log("Document Created:", {
+  //         documentId,
+  //         title,
+  //         signers,
+  //         creator,
+  //       });
+  //       if (signers.includes(address ?? "0x")) {
+  //         const notification = `A new document "${title}" was created by ${creator.slice(0, 6)}...${creator.slice(-4)}. You have been assigned as a signer.`;
+  //         addNotification(notification);
+  //       }
+  //     });
+  //   },
+  // });
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 text-gray-800">
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="flex-grow container mx-auto px-4 py-12 mt-16">
         {" "}
-      
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -67,40 +130,6 @@ const Dashboard = () => {
             </motion.button>
           </motion.div>
 
-          {/* Recent Activity Card */}
-          <motion.div
-            className="bg-white rounded-2xl p-8 shadow-xl"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-          >
-            <h3 className="text-2xl font-bold mb-4 text-indigo-600">
-              Recent Activity
-            </h3>
-            <ul className="space-y-4">
-              {[
-                "Document A signed",
-                "Document B pending signature",
-                "New document created",
-              ].map((activity, index) => (
-                <motion.li
-                  key={index}
-                  className="flex items-center space-x-3 bg-indigo-50 p-3 rounded-lg"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={controls}
-                  custom={index}
-                >
-                  <FileText
-                    size={18}
-                    className="text-indigo-600 flex-shrink-0"
-                  />
-                  <span className="flex-grow text-gray-800 font-medium">
-                    {activity}
-                  </span>
-                </motion.li>
-              ))}
-            </ul>
-          </motion.div>
         </div>
         {/* Statistics Section */}
         <motion.div
@@ -110,8 +139,11 @@ const Dashboard = () => {
           transition={{ delay: 0.4, duration: 0.5 }}
         >
           {[
-            { icon: FileText, title: "Documents Signed", value: "128" },
-            { icon: Users, title: "Active Users", value: "56" },
+            {
+              icon: FileText,
+              title: "Assigned Documents",
+              value: documentCount || 0,
+            },
             { icon: Activity, title: "Completion Rate", value: "94%" },
           ].map((stat, index) => (
             <motion.div

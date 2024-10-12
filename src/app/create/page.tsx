@@ -1,17 +1,30 @@
 "use client";
-import React, { useState, useEffect, KeyboardEvent } from "react";
+import React, { useState, useEffect, KeyboardEvent, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useDropzone, DropzoneRootProps, DropzoneInputProps } from "react-dropzone";
-import { FileText, User, Upload, CheckCircle } from "lucide-react";
-import { toast } from "react-toastify";
+import { useDropzone } from "react-dropzone";
+import { FileText, User, Upload, CheckCircle, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAddress } from "@coinbase/onchainkit/identity";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../constants";
+import lighthouse from "@lighthouse-web3/sdk";
+import { useToast } from "../AppContext";
+import type { ContractFunctionParameters } from "viem";
+import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
+import TransactionWrapper from "../components/TransactionWrapper";
+import {
+  Transaction,
+  TransactionButton,
+  TransactionStatus,
+  TransactionStatusAction,
+  TransactionStatusLabel,
+} from "@coinbase/onchainkit/transaction";
 
 interface FormData {
   title: string;
   description: string;
   signerAddresses: string[];
   emails: string[];
-  files: File[] | string;  
+  files: File[];
 }
 
 const CreateSignature: React.FC = () => {
@@ -20,72 +33,28 @@ const CreateSignature: React.FC = () => {
     description: "",
     signerAddresses: [],
     emails: [],
-    files: "",
+    files: [],
   });
-  const [currentStep, setCurrentStep] = useState<number>(0);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [currentAddress, setCurrentAddress] = useState<string>("");
-  const [currentEmail, setCurrentEmail] = useState<string>("");
-  const [isSuccess, setIsSuccess] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [fileHash, setFileHash] = useState<string>("");
+  const [transactionArgs, setTransactionArgs] = useState<any[]>([]);
+  const [currentInput, setCurrentInput] = useState({ address: "", email: "" });
+  const [isTransactionReady, setIsTransactionReady] = useState(false);
+  const { showToast } = useToast();
+
   const router = useRouter();
 
-  const { getRootProps, getInputProps, isDragActive }: 
-  { getRootProps: (props?: DropzoneRootProps | undefined) => DropzoneRootProps; 
-    getInputProps: (props?: DropzoneInputProps | undefined) => DropzoneInputProps; 
-    isDragActive: boolean; 
-  } = useDropzone({
-    onDrop: (acceptedFiles: File[]) => {
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop: (acceptedFiles) => {
       setFormData((prev) => ({ ...prev, files: acceptedFiles }));
     },
   });
-
-
-  const handleSubmit = async (): Promise<void> => {
-    if (formData.signerAddresses.length === 0) {
-      toast.error("Please add at least one signer address, press space after entering each address");
-      return;
-    }
-    if (formData.emails.length === 0) {
-      toast.error("Please add at least one email");
-      return;
-    }
-
-    try {
-    //   const file = await uploadFile(formData.files as File[]);
-    //   setIsSubmitting(true);
-    //   setIsLoading(true);
-
-    //   await createDocument(
-    //     formData.title,
-    //     formData.description,
-    //     file.data.Hash,
-    //     formData.signerAddresses,
-    //     formData.emails
-    //   );
-
-      setIsSubmitting(false);
-      setIsSuccess(true);
-      toast.success("Signature request created successfully!");
-
-    } catch (error) {
-      setIsSubmitting(false);
-      setIsLoading(false);
-      toast.error("Failed to create signature request");
-    }
-  };
 
   const steps = [
     { title: "Document Details", icon: FileText },
     { title: "Upload Files", icon: Upload },
     { title: "Signer Information", icon: User },
   ];
-
-  useEffect(() => {
-    if (isSuccess) {
-      setCurrentStep(steps.length);
-    }
-  }, [isSuccess]);
 
   const inputVariants = {
     focus: { scale: 1.02, boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)" },
@@ -95,36 +64,74 @@ const CreateSignature: React.FC = () => {
     hover: { scale: 1.05, boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)" },
     tap: { scale: 0.95 },
   };
+  const prepareTransaction = useCallback(async () => {
+    if (!formData.signerAddresses.length || formData.files.length === 0) {
+      return;
+    }
+    try {
+      const file = await lighthouse.upload(
+        formData.files,
+        "9ffdacd7.96af6c3f7fec4decad3b337dcc108804"
+      );
+      setFileHash(file.data.Hash);
+      setTransactionArgs([
+        formData.title,
+        formData.description,
+        file.data.Hash,
+        formData.signerAddresses,
+      ]);
+      setIsTransactionReady(true);
+    } catch (error) {
+      console.error("Failed to prepare signature request:", error);
+      showToast(
+        "Failed to prepare signature request. Please try again.",
+        "error"
+      );
+    }
+  }, [formData, showToast]);
 
-  const handleAddAddress = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === " ") {
+  useEffect(() => {
+    if (currentStep === steps.length - 1) {
+      prepareTransaction();
+    } else {
+      setIsTransactionReady(false);
+    }
+  }, [currentStep, prepareTransaction]);
+
+  const handleAddInput = (
+    e: KeyboardEvent<HTMLInputElement>,
+    type: "address" | "email"
+  ) => {
+    if (e.key === "Enter") {
       e.preventDefault();
-      if (currentAddress) {
+      if (currentInput[type]) {
         setFormData((prev) => ({
           ...prev,
-          signerAddresses: [...prev.signerAddresses, currentAddress],
+          [type === "address" ? "signerAddresses" : "emails"]: [
+            ...prev[type === "address" ? "signerAddresses" : "emails"],
+            currentInput[type],
+          ],
         }));
-        setCurrentAddress("");
+        setCurrentInput({ ...currentInput, [type]: "" });
       }
     }
   };
 
-  const handleAddEmail = (e: KeyboardEvent<HTMLInputElement>): void => {
-    if (e.key === " ") {
-      e.preventDefault();
-      if (currentEmail) {
-        setFormData((prev) => ({
-          ...prev,
-          emails: [...prev.emails, currentEmail],
-        }));
-        setCurrentEmail("");
-      }
-    }
+  const removeInput = (index: number, type: "address" | "email") => {
+    setFormData((prev) => ({
+      ...prev,
+      [type === "address" ? "signerAddresses" : "emails"]: prev[
+        type === "address" ? "signerAddresses" : "emails"
+      ].filter((_, i) => i !== index),
+    }));
   };
+
+  const handleOnStatus = useCallback((status: LifecycleStatus) => {
+    showToast(status.statusName, "info");
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center p-8">
-      {/* Back Button */}
       <div className="mb-8">
         <button
           onClick={() => router.back()}
@@ -142,7 +149,6 @@ const CreateSignature: React.FC = () => {
         <h1 className="text-4xl font-bold text-center mb-8 text-gray-800">
           Create a Signature Request
         </h1>
-
         <div className="flex justify-between mb-12">
           {steps.map((step, index) => (
             <motion.div
@@ -166,8 +172,7 @@ const CreateSignature: React.FC = () => {
             </motion.div>
           ))}
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form className="space-y-6">
           <AnimatePresence mode="wait">
             {currentStep === 0 && (
               <motion.div
@@ -203,7 +208,6 @@ const CreateSignature: React.FC = () => {
                 />
               </motion.div>
             )}
-
             {currentStep === 1 && (
               <motion.div
                 key="step2"
@@ -228,23 +232,19 @@ const CreateSignature: React.FC = () => {
                     <Upload size={48} className="mx-auto text-gray-400 mb-4" />
                     <p className="text-lg">
                       {isDragActive
-                        ? "Drop files here"
-                        : "Drag 'n' drop files here, or click to select"}
+                        ? "Drop files here..."
+                        : "Drag & drop files here, or click to select files"}
                     </p>
+                    {formData.files.length > 0 && (
+                      <p className="mt-4 text-blue-600 font-semibold">
+                        {formData.files.length} file
+                        {formData.files.length !== 1 ? "s" : ""} selected
+                      </p>
+                    )}
                   </motion.div>
                 </div>
-                {formData.files.length > 0 && (
-                  <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 text-center text-green-600"
-                  >
-                    {formData.files.length} file(s) selected
-                  </motion.p>
-                )}
               </motion.div>
             )}
-
             {currentStep === 2 && (
               <motion.div
                 key="step3"
@@ -253,137 +253,126 @@ const CreateSignature: React.FC = () => {
                 exit={{ opacity: 0, x: -50 }}
                 transition={{ duration: 0.5 }}
               >
-                <div>
-                  <motion.input
-                    type="text"
-                    placeholder="Signer Address / ENS name / Base Name"
-                    value={currentAddress}
-                    onChange={(e) => setCurrentAddress(e.target.value)}
-                    onKeyDown={handleAddAddress}
-                    className="block w-full border rounded-lg p-3 text-lg mb-4 text-black"
-                    whileFocus="focus"
-                    variants={inputVariants}
-                  />
-                  <div className="flex flex-wrap">
-                    {formData.signerAddresses.map((address, index) => (
-                      <div
-                        key={index}
-                        className="bg-blue-200 text-black p-2 rounded-lg shadow-md mr-2 mb-2 flex items-center"
+                <motion.input
+                  type="text"
+                  placeholder="Add Signer Address"
+                  value={currentInput.address}
+                  onChange={(e) =>
+                    setCurrentInput({
+                      ...currentInput,
+                      address: e.target.value,
+                    })
+                  }
+                  onKeyDown={(e) => handleAddInput(e, "address")}
+                  className="block w-full border rounded-lg p-3 text-lg text-black"
+                  whileFocus="focus"
+                  variants={inputVariants}
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {formData.signerAddresses.map((address, index) => (
+                    <div
+                      key={index}
+                      className="bg-blue-100 text-white px-3 py-1 rounded-full flex items-center"
+                    >
+                      <span className="mr-2 text-black">{address}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeInput(index, "address")}
                       >
-                        <span className="text-black">{address}</span>
-                        <button
-                          className="ml-2 text-black-500 hover:text-black-700 font-bold"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              signerAddresses: prev.signerAddresses.filter(
-                                (_, i) => i !== index
-                              ),
-                            }));
-                          }}
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <motion.input
-                    type="email"
-                    placeholder="Email"
-                    value={currentEmail}
-                    onChange={(e) => setCurrentEmail(e.target.value)}
-                    onKeyDown={handleAddEmail}
-                    className="block w-full border rounded-lg p-3 text-lg mb-4 text-black"
-                    whileFocus="focus"
-                    variants={inputVariants}
-                  />
-                  <div className="flex flex-wrap">
-                    {formData.emails.map((email, index) => (
-                      <div
-                        key={index}
-                        className="bg-blue-200 text-black p-2 rounded-lg shadow-md mr-2 mb-2 flex items-center"
+                <motion.input
+                  type="email"
+                  placeholder="Add Signer Email"
+                  value={currentInput.email}
+                  onChange={(e) =>
+                    setCurrentInput({ ...currentInput, email: e.target.value })
+                  }
+                  onKeyDown={(e) => handleAddInput(e, "email")}
+                  className="block w-full border rounded-lg p-3 text-lg text-black mt-4"
+                  whileFocus="focus"
+                  variants={inputVariants}
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {formData.emails.map((email, index) => (
+                    <div
+                      key={index}
+                      className="bg-red-100 text-black px-3 py-1 rounded-full flex items-center"
+                    >
+                      <span className="mr-2 text-black">{email}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeInput(index, "email")}
                       >
-                        <span className="text-black">{email}</span>
-                        <button
-                          className="ml-2 text-black-500 hover:text-black-700 font-bold"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              emails: prev.emails.filter((_, i) => i !== index),
-                            }));
-                          }}
-                        >
-                          &times;
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-
-          <div className="flex justify-between mt-8">
-            {currentStep > 0 && (
-              <motion.button
-                type="button"
-                onClick={() => setCurrentStep((prev) => prev - 1)}
-                className="bg-gray-200 text-gray-800 py-3 px-6 rounded-lg text-lg"
-                whileHover="hover"
-                whileTap="tap"
-                variants={buttonVariants}
-              >
-                Back
-              </motion.button>
-            )}
+          <motion.div className="flex justify-between mt-6">
             <motion.button
-              type="button" // Keep type as "button" to prevent premature form submission
-              onClick={() => {
-                if (currentStep < steps.length - 1) {
-                  setCurrentStep((prev) => prev + 1); // Move to the next step
-                } else {
-                  handleSubmit(); // Submit the form when the last step is reached
-                }
-              }}
-              className={`bg-blue-600 text-white py-3 px-6 rounded-lg text-lg ${
-                isSubmitting || isLoading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-              disabled={isSubmitting || isLoading}
+              type="button"
+              onClick={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+              className="px-6 py-3 rounded-md bg-gray-400 text-white"
+              disabled={currentStep === 0}
+              variants={buttonVariants}
               whileHover="hover"
               whileTap="tap"
-              variants={buttonVariants}
             >
-              {currentStep === steps.length - 1
-                ? isSubmitting || isLoading
-                  ? "Creating..."
-                  : "Create Signature Request"
-                : "Next"}
+              Back
             </motion.button>
-          </div>
-        </form>
-
-        <AnimatePresence>
-          {isSuccess && (
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className="mt-8 text-center"
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 0.5 }}
+            {currentStep < steps.length - 1 ? (
+              <motion.button
+                type="button"
+                onClick={() => setCurrentStep((prev) => prev + 1)}
+                className="px-6 py-3 rounded-md bg-blue-500 text-white"
+                disabled={
+                  (currentStep === 0 &&
+                    (!formData.title || !formData.description)) ||
+                  (currentStep === 1 && formData.files.length === 0)
+                }
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
               >
-                <CheckCircle size={48} className="text-green-500 mx-auto" />
-              </motion.div>
-              <p className="text-xl text-green-600 mt-4">
-                Signature request created successfully!
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                Next
+              </motion.button>
+            ) : (
+              <TransactionWrapper
+                contracts={
+                  isTransactionReady
+                    ? ([
+                        {
+                          address: CONTRACT_ADDRESS,
+                          abi: CONTRACT_ABI,
+                          functionName: "createDocument",
+                          args: transactionArgs,
+                        },
+                      ] as unknown as ContractFunctionParameters[])
+                    : []
+                }
+                chainId={84532}
+                onStatus={handleOnStatus}
+              >
+                <TransactionButton
+                  className="w-50 px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-md shadow-md transition duration-300 ease-in-out hover:from-purple-500 hover:to-indigo-500 hover:shadow-lg  ml-auto"
+                  text="Create Signature"
+                  disabled={!isTransactionReady}
+                />
+                <TransactionStatus>
+                  <TransactionStatusAction />
+                  <TransactionStatusLabel />
+                </TransactionStatus>
+              </TransactionWrapper>
+            )}
+          </motion.div>
+        </form>
       </motion.div>
     </div>
   );
