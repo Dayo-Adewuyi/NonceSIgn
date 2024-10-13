@@ -1,5 +1,5 @@
 export const CONTRACT_ABI = [
-        {
+    {
         "inputs": [],
         "stateMutability": "nonpayable",
         "type": "constructor"
@@ -230,12 +230,105 @@ export const CONTRACT_ABI = [
                 "type": "address"
             }
         ],
-        "name": "getDocumentsAssignedToUser",
+        "name": "getDocumentsAssignedToUserForSigning",
         "outputs": [
             {
-                "internalType": "uint256[]",
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "id",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "title",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "description",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileHash",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "address[]",
+                        "name": "signers",
+                        "type": "address[]"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "creator",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "completed",
+                        "type": "bool"
+                    }
+                ],
+                "internalType": "struct NonceSign.Document[]",
                 "name": "",
-                "type": "uint256[]"
+                "type": "tuple[]"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_user",
+                "type": "address"
+            }
+        ],
+        "name": "getDocumentsCreatedByUser",
+        "outputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "uint256",
+                        "name": "id",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "title",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "description",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "fileHash",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "address[]",
+                        "name": "signers",
+                        "type": "address[]"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "creator",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "completed",
+                        "type": "bool"
+                    }
+                ],
+                "internalType": "struct NonceSign.Document[]",
+                "name": "",
+                "type": "tuple[]"
             }
         ],
         "stateMutability": "view",
@@ -312,5 +405,5 @@ export const CONTRACT_ABI = [
     }
 ]
 
-export const CONTRACT_ADDRESS = "0x336172f27e937e4810D1b4611D0d98E885f87095";
+export const CONTRACT_ADDRESS = "0x16E7fd6a1DD4B8CCc7e0f5c79eA9B21eB5a43Fc6";
 

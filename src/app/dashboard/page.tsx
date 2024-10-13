@@ -19,7 +19,7 @@ const Dashboard = () => {
   const { data: documentsAssigned } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
-    functionName: "getDocumentsAssignedToUser",
+    functionName: "getDocumentsAssignedToUserForSigning",
     args: [address],
   });
 

@@ -6,6 +6,9 @@ import { PencilIcon } from "@heroicons/react/24/outline";
 import PDFSignModal from "../components/PDFSignModal";
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+import { useReadContracts, useAccount } from "wagmi";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../constants";
+import { useToast } from "../AppContext";
 
 interface Document {
   id: string;
@@ -16,37 +19,61 @@ interface Document {
 }
 
 export default function Pending() {
-  const [pendingDocs, setPendingDocs] = useState<Document[]>([]); 
-  const [loading, setLoading] = useState<boolean>(true); 
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false); 
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null); 
+  const [pendingDocs, setPendingDocs] = useState<Document[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const router = useRouter();
+  const { address } = useAccount();
+  const { showToast } = useToast();
 
- 
-  const handleSave = async (documentId: string, modifiedPdfBytes: Uint8Array) => {
+  const { data, isLoading, isError } = useReadContracts({
+    contracts: [
+      {
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "getDocumentsAssignedToUserForSigning",
+        args: [address],
+      },
+    ],
+  });
+
+  const convertResult = () => {
+    if (!data) return;
+
+    const userCreatedDocs = data[0].result;
+
+    if (Array.isArray(userCreatedDocs)) {
+
+      const ucd =
+        userCreatedDocs?.map((item: any, index: number) => ({
+          id: item.id.toString() || `doc_${index}`,
+          title: item.title,
+          description: item.description,
+          signers: item.signers,
+          completed: item.completed || false,
+          fileHash: item.fileHash,
+          creator: item.creator,
+        })) || [];
+          console.log(userCreatedDocs)
+          console.log(ucd)
+      setPendingDocs(ucd);
+    }
+  };
+
+  useEffect(() => {
+    if (data && !isLoading && !isError) {
+      convertResult();
+      setLoading(false);
+    }
+  }, [data, isLoading, isError]);
+
+  const handleSave = async (
+    documentId: string,
+    modifiedPdfBytes: Uint8Array
+  ) => {
     try {
-      console.log("Saving document:", documentId);
-
-      const blob = new Blob([modifiedPdfBytes], { type: "application/pdf" });
-
-      const file = new File([blob], "modified.pdf", {
-        type: "application/pdf",
-        lastModified: new Date().getTime(),
-      });
-
-      const fileList: File[] = [file]; 
-      console.log("Uploading file:", file.name, "Size:", file.size, "bytes");
-
-  
-    //   const response = await uploadFile(fileList);
-    //   console.log("Upload response:", response);
-
-    //   toast.info("Signing document");
-
-  
-    //   await signDocument(documentId, response.data.Hash);
-
-      toast.success("Document signed successfully");
+      showToast("Document signed successfully", "success");
       router.refresh();
     } catch (error) {
       console.error("Error saving modified PDF:", error);
@@ -54,36 +81,19 @@ export default function Pending() {
     }
   };
 
-
-  const getPendingDocs = async (): Promise<Document[]> => {
-    try {
-    //   const docs = await getDocumentsAssignedToUser();
-    //   console.log("Fetched documents:", docs);
-    //   return docs;
-    return [];
-    } catch (error) {
-      console.error("Error fetching documents:", error);
-      return [];
-    }
-  };
-
-
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const fetchedDocs = await getPendingDocs();
-      if (fetchedDocs.length > 0) {
-        setPendingDocs(fetchedDocs);
-      }
       setLoading(false);
     };
 
     fetchData();
   }, []);
 
-
   const handleSignClick = (doc: Document) => {
+    console.log(doc)
     setSelectedDoc(doc);
+    
     router.push(
       `/sign?id=${doc.id}&fileHash=${doc.fileHash}&title=${doc.title}&description=${doc.description}&creator=${doc.creator}`
     );

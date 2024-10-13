@@ -4,7 +4,8 @@ import { Tab, TabGroup, TabList, TabPanels, TabPanel } from "@headlessui/react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DocumentIcon, PencilIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
-
+import { useReadContracts, useAccount } from "wagmi";
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../constants";
 
 interface Document {
   id: string;
@@ -13,7 +14,7 @@ interface Document {
   signers: string[];
   completed: boolean;
   fileHash: string;
-  creator?: string; 
+  creator?: string;
 }
 
 export default function DocumentManagement() {
@@ -21,27 +22,63 @@ export default function DocumentManagement() {
   const [pendingDocs, setPendingDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const router = useRouter();
+  const { address } = useAccount();
 
-  const handleGetUserCreatedDocuments = async (): Promise<void> => {
-    // const docs = await getUserCreatedDocuments();
-    // setCreatedDocs(docs);
-  };
-
-  const handleGetUserSignedDocuments = async (): Promise<void> => {
-    // const docs = await getUserSignedDocuments();
-    // setPendingDocs(docs);
-  };
+  const { data, isLoading, isError } = useReadContracts({
+    contracts: [
+      {
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "getDocumentsCreatedByUser",
+        args: [address],
+      },
+      {
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "getDocumentsAssignedToUserForSigning",
+        args: [address],
+      },
+    ],
+  });
 
   useEffect(() => {
-    const fetchDocuments = async (): Promise<void> => {
-      setLoading(true);
-      await handleGetUserCreatedDocuments();
-      await handleGetUserSignedDocuments();
+    if (data && !isLoading && !isError) {
+      convertResult();
       setLoading(false);
-    };
+    }
+  }, [data, isLoading, isError]);
 
-    fetchDocuments();
-  }, []);
+  const convertResult = () => {
+    if (!data || !Array.isArray(data)) return;
+
+    const userCreatedDocs = data[0].result;
+    const userPendingDocs = data[1].result;
+
+    const convertToDocument = (item: any, index: number): Document => ({
+      id: item.id || `doc_${index}`,
+      title: item.title || '',
+      description: item.description || '',
+      signers: Array.isArray(item.signers) ? item.signers : [],
+      completed: item.completed || false,
+      fileHash: item.fileHash || '',
+      creator: item.creator || ''
+    });
+
+    if (Array.isArray(userCreatedDocs)) {
+      const ucd = userCreatedDocs.map(convertToDocument);
+      setCreatedDocs(ucd);
+    } else {
+      setCreatedDocs([]);
+    }
+
+    if (Array.isArray(userPendingDocs)) {
+      const upd = userPendingDocs.map(convertToDocument);
+      setPendingDocs(upd);
+    } else {
+      setPendingDocs([]);
+    }
+  };
+  
 
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -83,7 +120,7 @@ export default function DocumentManagement() {
                 ${selected ? "bg-white shadow" : "text-blue-100 hover:bg-white/[0.12] hover:text-white"}`
               }
             >
-              Signed Documents
+              Pending Documents
             </Tab>
           </TabList>
           <TabPanels>

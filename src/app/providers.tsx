@@ -7,7 +7,8 @@ import { OnchainKitProvider } from "@coinbase/onchainkit";
 import { baseSepolia } from "wagmi/chains";
 import { getConfig } from "@/wagmi";
 import { ToastProvider } from "./AppContext";
-
+import { pdfjs } from "react-pdf";
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 export function Providers(props: {
   children: ReactNode;
   initialState?: State;

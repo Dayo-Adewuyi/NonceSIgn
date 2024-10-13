@@ -43,7 +43,6 @@ contract NonceSign is Pausable, ReentrancyGuard {
         uint256 indexed documentId,
         address signer,
         string signatureHash
-        
     );
 
     /// @notice Emitted when a document is fully signed and completed.
@@ -96,10 +95,7 @@ contract NonceSign is Pausable, ReentrancyGuard {
             "Not authorized to sign"
         );
         require(!hasSignerSigned(_documentId, msg.sender), "Already signed");
-        require(
-            bytes(_signatureHash).length != 0,
-            "Signature hash cannot be empty"
-        );
+        require(bytes(_signatureHash).length != 0, "Signature hash cannot be empty");
 
         Signature memory newSignature = Signature({
             signer: msg.sender,
@@ -120,32 +116,38 @@ contract NonceSign is Pausable, ReentrancyGuard {
     }
 
     /// @notice Returns document IDs assigned to a specific user to sign.
-    function getDocumentsAssignedToUser(
-        address _user
-    ) external view returns (uint256[] memory) {
+      function getDocumentsCreatedByUser(address _user) external view returns (Document[] memory) {
+        uint256[] storage userDocs = userCreatedDocuments[_user];
+        Document[] memory createdDocs = new Document[](userDocs.length);
+
+        for (uint256 i = 0; i < userDocs.length; i++) {
+            createdDocs[i] = documents[userDocs[i]];
+        }
+
+        return createdDocs;
+    }
+
+    /// @notice Returns all documents assigned to a specific user for signing.
+    /// @param _user The address of the user whose assigned documents are being retrieved.
+    /// @return An array of Document structs assigned to the specified user for signing.
+    function getDocumentsAssignedToUserForSigning(address _user) external view returns (Document[] memory) {
         uint256 assignedCount = 0;
         for (uint256 i = 0; i < documentCount; i++) {
-            if (
-                isAuthorizedSigner(_user, documents[i].signers) &&
-                !documents[i].completed
-            ) {
+            if (isAuthorizedSigner(_user, documents[i].signers) && !documents[i].completed) {
                 assignedCount++;
             }
         }
 
-        uint256[] memory assignedDocuments = new uint256[](assignedCount);
+        Document[] memory assignedDocs = new Document[](assignedCount);
         uint256 index = 0;
         for (uint256 i = 0; i < documentCount; i++) {
-            if (
-                isAuthorizedSigner(_user, documents[i].signers) &&
-                !documents[i].completed
-            ) {
-                assignedDocuments[index] = i;
+            if (isAuthorizedSigner(_user, documents[i].signers) && !documents[i].completed) {
+                assignedDocs[index] = documents[i];
                 index++;
             }
         }
 
-        return assignedDocuments;
+        return assignedDocs;
     }
 
     /// @notice Returns details of a specific document.

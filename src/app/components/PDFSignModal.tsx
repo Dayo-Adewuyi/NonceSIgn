@@ -61,7 +61,7 @@ export default function PDFSignModal({
   const loadPDF = useCallback(async () => {
     try {
       const response = await fetch(
-        `https://gateway.pinata.cloud/ipfs/${document.fileHash}`
+        `https://gateway.lighthouse.storage/ipfs/${document.fileHash}`
       );
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
