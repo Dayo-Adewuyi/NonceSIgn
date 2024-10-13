@@ -1,7 +1,7 @@
 # NonceSign DApp: Revolutionizing Document Signing on Base
 
 ## 🚀 Overview
-NonceSign is a cutting-edge decentralized application (DApp) that's redefining secure, tamper-proof document management on the Base blockchain. Built for the high-stakes world of digital agreements, NonceSign combines military-grade security with user-friendly design to create, sign, and track documents with unprecedented reliability.
+NonceSign is a cutting-edge decentralized application (DApp) that's redefining secure, tamper-proof document management on the Base blockchain. Built for the high-stakes world of digital agreements, NonceSign combines security with user-friendly design to create, sign, and track documents with unprecedented reliability.
 
 ## 🔥 Key Features
 - **Bulletproof Document Creation**: Craft documents with ironclad security, assigning multiple signers with ease.
