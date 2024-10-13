@@ -12,10 +12,10 @@ NonceSign is a cutting-edge decentralized application (DApp) that's redefining s
 
 ## 🛠 Tech Stack
 - Solidity: The backbone of our smart contracts
-- Hardhat: Our weapon of choice for Ethereum development
+- Hardhat: Our weapon of choice for Base development
 - React & Next.js: Powering our lightning-fast frontend
 - Tailwind CSS: For sleek, responsive design
-- Wagmi: Simplifying Ethereum interactions
+- Wagmi: Simplifying Base interactions
 - Coinbase Wallet SDK: Seamless crypto wallet integration
 - Onchain kit: Enhancing our blockchain capabilities
 
@@ -51,7 +51,7 @@ NonceSign is a cutting-edge decentralized application (DApp) that's redefining s
     ```
 
 ## 🌟 Live Demo
-Experience the revolution: [NonceSign Demo](https://nonceSign.vercel.app)
+Experience the revolution: [NonceSign Demo](https://nonce-sign.vercel.app/)
 
 ## 🔒 Security: Our Top Priority
 - Smart contract audited by top blockchain security firms
